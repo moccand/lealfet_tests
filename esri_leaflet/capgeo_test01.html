@@ -1,1 +1,233 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+    <title>EsriLeaflet L93</title>
+    <!-- Load Leaflet from CDN -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+    <!-- Proj4 and Proj4Leaflet -->
+    <script src="https://unpkg.com/proj4@2.4.3"></script>
+    <script src="https://unpkg.com/proj4leaflet@1.0.1"></script>	
+	
+    <!-- Load Esri Leaflet from CDN -->
+    <script src="https://unpkg.com/esri-leaflet@3.0.10/dist/esri-leaflet.js"></script>
+    <script src="https://unpkg.com/esri-leaflet-vector@4.2.3/dist/esri-leaflet-vector.js"></script>
+	
+	<script type="text/javascript" src="https://edihasaj.github.io/leaflet-coord-projection/coord-projection.js"></script>
+
+	<link rel="stylesheet" type="text/css" href="https://ptma.github.io/Leaflet.Measure/src/leaflet.measure.css" />
+    <script type="text/javascript" src="https://ptma.github.io/Leaflet.Measure/src/leaflet.measure.js"></script>
+	
+	
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      #map {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        right: 0;
+        left: 0;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 14px;
+        color: #323232;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="map"></div>
+
+    <script>
+
+	  
+	  /*
+	     l'objet CRS est initié avec les informations du système de tuilage utilisé pour nos services.
+		 Mais ils sont en train de changer c'est pour cela que certains services ne marchent pas. 
+		 Voir plus bas.
+	  */
+
+
+	  const crs = new L.Proj.CRS(
+        "EPSG:2154",
+        "+proj=lcc +lat_0=46.5 +lon_0=3 +lat_1=49 +lat_2=44 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs",
+        {
+          origin: [-39227086.220589, 53216267.198202],
+          resolutions: [
+            305.7480844128355,
+            152.874174498349,
+            76.43695495724326,
+            38.218609770552874,
+            19.109304885276437,
+            9.554652442638218,
+            4.777326221319109,
+            2.3886631106595546,
+            1.1943315553297773,
+            0.5971657776648887,
+            0.2984505969011938,
+            0.13229193125052918,
+            0.05291677250021167
+          ]
+        }
+      );
+
+
+
+
+
+
+
+	/* 
+	à l'initialisation de la carte il faut centrer avec des coordonnées qui ne sont pas dans le système de l'objet CRS que l'on vient de construire
+	
+	- est-ce que cela veut dire que l'objet carte reste dans un système "Web" et que l'objet crs ne servira à retransformer la données recue en L93 pour qu'elle s'affiche bien ?
+	    => Dans ce cas ca voudrait dire qu'il y a un certain "coût" côté client à utiliser autre chose que du WebMercator.
+	
+	- est-ce que c'est juste une convention pour que la fonction setView reste toujours en WGS84 et que derrière (implicitement) il y a une transformation en L93 ?
+	
+	*/
+	
+	const map = L.map("map", {
+		crs:crs,
+		minZoom: 0,
+		maxZoom: 12,
+      })
+
+
+
+ 	function showUrls(){
+		var map_bounds = map.getBounds();
+		var map_extent = map_bounds.getWest() + "," + map_bounds.getSouth() + "," + map_bounds.getNorth() + "," + map_bounds.getEast();
+	    var map_size =  map.getSize().x + "," + map.getSize().y;
+		var map_crs = "EPSG:4326";
+		
+		// semble ne remonter 
+		console.log("MapServer/queryLegends avec returnVisibleOnly True");
+	    var url_dynamique = "https://capgeo.sig.paris.fr/arcgis/rest/services/capgeo_du/DU_ADSConsult_v3/MapServer/queryLegends?bbox=" + map_extent
+	    +"&bboxSR=" + map_crs + "layers=&layerDefs=&size=" + map_size + "format=png&f=json&returnVisibleOnly=true"
+	    console.log(url_dynamique);
+		
+		
+		console.log("MapServer/queryLegends avec returnVisibleOnly False");
+	    var url_full = "https://capgeo.sig.paris.fr/arcgis/rest/services/capgeo_du/DU_ADSConsult_v3/MapServer/queryLegends?bbox=" + map_extent
+	    +"&bboxSR=" + map_crs + "layers=&layerDefs=&size=" + map_size + "format=png&f=json&returnVisibleOnly=false"
+	    console.log(url_full);
+		
+		
+		console.log("MapServer/legend?f=pjson Toute la légende (sans prise en compte de l'emprise)");
+		console.log("https://capgeo.sig.paris.fr/arcgis/rest/services/capgeo_du/DU_ADSConsult_v3/MapServer/legend?f=pjson");
+		
+		
+		// interessant pour récupérer de quoi construire une légende en évitant de remonter des couches inutiles
+		// les couches utiles pourraient être précisiées dans une configuration
+		console.log("MapServer/legend?f=pjson Toute la légende avec DyamicLayers (sans prise en compte de l'emprise)");
+		console.log("https://capgeo.sig.paris.fr/arcgis/rest/services/capgeo_du/DU_ADSConsult_v3/MapServer/legend?dynamicLayers=%5B0%2C1%2C2%2C3%2C4%2C5%5D&f=json");
+
+		console.log("MapServer/layers?f=pjson");
+		console.log("https://capgeo.sig.paris.fr/arcgis/rest/services/capgeo_du/DU_ADSConsult_v3/MapServer/layers?f=pjson");
+	}
+
+
+	  map.on('load', showUrls).setView([48.854626, 2.347755], 4); //Latitude, longitude
+
+
+	  map.on('moveend', showUrls);
+
+ 
+ 
+ 
+ 
+ 
+	/* Définition des couches */
+	
+	var base_fond = L.esri.tiledMapLayer({
+          url: "https://capgeo.sig.paris.fr/arcgis/rest/services/CapGEO_FDP/FDP_CAPGEO_Plan_Ville/MapServer",
+		  maxZoom: 12,
+          minZoom: 0,
+        })
+        .addTo(map);
+	
+	
+	/* ne marche pas car intranet, mais même en intranet n'est pas publié avec le même schéma de tuilage */
+	var base_plangeneraux = L.esri.tiledMapLayer({
+          url: "https://geometierpub5.apps.paris.mdp/arcgis/rest/services/DU/DU_PLUb_EnqPub_PlansGeneraux_FDP/MapServer/",
+		  maxZoom: 12,
+          minZoom: 0,
+        });
+	
+	var base_plu2026 = L.esri.tiledMapLayer({
+          url: "https://capgeo.sig.paris.fr/arcgis/rest/services/CapGEO_FDP/PLU_2016/ImageServer",
+		  maxZoom: 12,
+          minZoom: 0,
+        });	
+	
+	
+	var layer_secteurs_aop = L.esri
+        .dynamicMapLayer({
+          url: "https://geometierpub5.apps.paris.mdp/arcgis/rest/services/DU/DU_PLUb_EnqPub_PlansGeneraux/MapServer",
+          opacity: 0.7
+        });
+
+	
+	var layer_permis = L.esri
+        .dynamicMapLayer({
+          url: "https://capgeo.sig.paris.fr/arcgis/rest/services/capgeo_du/DU_ADSConsult_v3/MapServer",
+          opacity: 0.7
+        });
+	  
+	  
+	/* outil affichage des couches */
+	var baseMaps = {
+    "Fond": base_fond,
+	"Plan Généraux": base_plangeneraux,
+	"PLU 2016": base_plu2026,
+	};
+
+	var overlayMaps = {
+    "Permis": layer_permis,
+	"Zonage et OAP sectorielles" : layer_secteurs_aop,
+	};  
+	  
+	var layerControl = L.control.layers(baseMaps, overlayMaps).addTo(map);
+	
+	/* outil affichage de coordonnées */
+	L.control.coordProjection({
+            crs: crs,
+        }).addTo(map);
+	  
+	/* outil de mesure */
+	/* Analyse : semble cohérent à ce que donnent des mesures avec la version Experience builder */
+    L.Measure = {
+		linearMeasurement: "Distances",
+		areaMeasurement: "Surfaces",
+		start: "Début",
+		meter: "m",
+		kilometer: "km",
+		squareMeter: "m²",
+		squareKilometers: "km²",
+    };
+
+    var measure = L.control.measure({title: "Mesures",}).addTo(map);
+
+
+
+	/* ajout des comportements sur la Map */
+	
+	// <xmin>, <ymin>, <xmax>, <ymax>
+	
+	
+
+
+
+
+    </script>
+
+  </body>
+
+</html>
 
